@@ -13,7 +13,10 @@ var PartitionNilError = errors.New("provided partition cannot be nil")
 var InvalidNumSplits = errors.New("a partition can only be split into partitions > 1")
 
 var BigOne *big.Int = big.NewInt(1)
+var BigZero *big.Int = big.NewInt(0)
 
+//InvalidPartitionError error that is returned after validating the partition
+//Error string contains the details of why the partition failed validation
 type InvalidPartitionError struct {
 	reason string
 }
@@ -42,6 +45,13 @@ type Partition struct {
 	//UpperBound of the partition, i.e. any given key in this partition will have
 	//value <=UpperBound
 	UpperBound *big.Int
+}
+
+func (p *Partition) String() string {
+	if p == nil {
+		return ""
+	}
+	return fmt.Sprintf("partition{label:%s, lb:%s, ub:%s}", p.Label, p.LowerBound.Text(16), p.UpperBound.Text(16))
 }
 
 //PartitionMap represents a hash range partition map, a partition Map contains one
@@ -81,6 +91,8 @@ type HashRange interface {
 
 //Splitter represents an abstraction that can split a given partition into
 //required number of partitions, a Splitter understands how to split a partition
+//implementations can use any strategy to split the partitions as long as they are valid
+//see reference implementation NewEvenSplitter for details
 type Splitter interface {
 
 	//Split splits the given partition p into numSplits if the splitter cannot split
@@ -122,7 +134,42 @@ func (e *evenSplitter) Split(p *Partition, numSplits int) ([]*Partition, error) 
 		panic("this cannot happen something mod numSplits is greater than numSplits")
 	}
 
-	result := make([]*Partition, 0, numSplits)
+	result := make([]*Partition, numSplits)
+	var prevUpperBound *big.Int
+
+	for i := 0; i < numSplits; i++ {
+
+		if prevUpperBound == nil {
+			label := fmt.Sprintf("%s-%d", p.Label, i)
+			firstPart := &Partition{Label: label}
+
+			// set first part lb to original part lb
+			lb := new(big.Int)
+			lb.SetString(p.LowerBound.String(), 10)
+			firstPart.LowerBound = lb
+
+			// set the upper bound
+
+			// if we need to carry over we need
+			carry := false
+			if leftOver.Cmp(BigZero) > 0 {
+				carry = true
+				leftOver.Sub(leftOver, BigOne)
+			}
+			ub := new(big.Int)
+			ub.Add(firstPart.LowerBound, step)
+
+			if carry {
+				ub.Add(ub, BigOne)
+			}
+			firstPart.UpperBound = ub
+
+			result[i] = firstPart
+			prevUpperBound = ub
+			fmt.Println(firstPart)
+			continue
+		}
+	}
 
 	return result, nil
 }
