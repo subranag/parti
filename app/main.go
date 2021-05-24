@@ -1,7 +1,12 @@
 package main
 
-import "fmt"
+import (
+	"math/big"
+
+	"github.com/subranag/parti"
+)
 
 func main() {
-	fmt.Println("Hello World Parti")
+	p := &parti.Partition{Label: "part-A", LowerBound: big.NewInt(0), UpperBound: big.NewInt(13)}
+	parti.NewEvenSplitter().Split(p, 4)
 }

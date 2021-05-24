@@ -1,9 +1,30 @@
 package parti
 
 import (
+	"errors"
+	"fmt"
 	"hash"
 	"math/big"
+	"strings"
 )
+
+var PartitionNilError = errors.New("provided partition cannot be nil")
+
+var InvalidNumSplits = errors.New("a partition can only be split into partitions > 1")
+
+var BigOne *big.Int = big.NewInt(1)
+
+type InvalidPartitionError struct {
+	reason string
+}
+
+func (e *InvalidPartitionError) Error() string {
+	return e.reason
+}
+
+func invalidPartition(reason string) *InvalidPartitionError {
+	return &InvalidPartitionError{reason: reason}
+}
 
 //Partition represents a single partition in the partition map
 //single partition is a unique range in the entire hash range partition map
@@ -67,14 +88,80 @@ type Splitter interface {
 	Split(p *Partition, numSplits int) ([]*Partition, error)
 }
 
-//evenSplitter splits the given partition into even number of splits
 type evenSplitter struct{}
 
 func (e *evenSplitter) Split(p *Partition, numSplits int) ([]*Partition, error) {
+	if p == nil {
+		return nil, PartitionNilError
+	}
 
-	return nil, nil
+	if numSplits <= 1 {
+		return nil, InvalidNumSplits
+	}
+
+	if err := validatePartition(p); err != nil {
+		return nil, err
+	}
+
+	// first get delta
+	delta := new(big.Int)
+	delta.Sub(p.UpperBound, p.LowerBound)
+	fmt.Println(delta)
+
+	// get divide result
+	step := new(big.Int)
+	step.Div(delta, big.NewInt(int64(numSplits)))
+	fmt.Println(step)
+
+	// get mod for left over
+	leftOver := new(big.Int)
+	leftOver.Mod(delta, big.NewInt(int64(numSplits)))
+	fmt.Println(leftOver)
+
+	if leftOver.Int64() >= int64(numSplits) {
+		panic("this cannot happen something mod numSplits is greater than numSplits")
+	}
+
+	result := make([]*Partition, 0, numSplits)
+
+	return result, nil
 }
 
+func validatePartition(p *Partition) error {
+
+	if p == nil {
+		return PartitionNilError
+	}
+
+	if p.LowerBound == nil || p.UpperBound == nil {
+		return invalidPartition("neither partition LowerBound nor UpperBound cannot be nil")
+	}
+
+	if p.LowerBound.Cmp(p.UpperBound) >= 0 {
+		return invalidPartition("partition LowerBound should be strictly less than UpperBound: LowerBound < UpperBound")
+	}
+
+	if p.Label == "" || strings.Trim(p.Label, " ") == "" {
+		return invalidPartition("partition label can be whitespaces/empty")
+	}
+
+	return nil
+}
+
+//NewEvenSplitter creates a Splitter that divides partitions into even splits
+//here is the splitting logic
+//
+// Step1: calculate the range delta of the partition to be split
+// range := (p.UpperBound - p.LowerBound) / numSplits
+//
+// Step2: see if does not evenly divide
+// leftOver := (p.UpperBound - p.LowerBound) % numSplits
+// if leftOver == 0 then numSplits evenly divides the partition
+// if leftOver > 0 then we need to distribute numSplits evenly across the splits
+// e.g. if numSplits = 10 and leftOver = 3 then we need to distribute 3 to some of the 10 splits
+//
+// Step3: from the p.LowerBound keep adding delta and generate closed intervals until
+// the numSplits criteria is met
 func NewEvenSplitter() Splitter {
 	return &evenSplitter{}
 }
