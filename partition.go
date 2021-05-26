@@ -15,6 +15,8 @@ var InvalidNumSplits = errors.New("a partition can only be split into partitions
 var BigOne *big.Int = big.NewInt(1)
 var BigZero *big.Int = big.NewInt(0)
 
+var splitter = NewEvenSplitter()
+
 //InvalidPartitionError error that is returned after validating the partition
 //Error string contains the details of why the partition failed validation
 type InvalidPartitionError struct {
@@ -88,6 +90,56 @@ type PartitionMap struct {
 
 	//Range is the HashRange of the partition map
 	Range HashRange
+
+	//keyMap is a map of partition labels to respective partitions
+	//NOTE: this filed is not exposed
+	keyMap map[string]*Partition
+}
+
+//NewMD5PartitionMap creates a partition map backed by the MD5 hash function
+//
+//name and partition label prefix have to be provided
+//
+//numSplits should be > 1
+func NewMD5PartitionMap(name, partLabelPrefix string, numSplits int) (*PartitionMap, error) {
+	return NewPartitionMap(newMD5HashRange(), name, partLabelPrefix, numSplits)
+}
+
+//NewSHA256PartitionMap creates a partition map backed by the SHA256 hash function
+//
+//name and partition label prefix have to be provided
+//
+//numSplits should be > 1
+func NewSHA256PartitionMap(name, partLabelPrefix string, numSplits int) (*PartitionMap, error) {
+	return NewPartitionMap(newSHA256HashRange(), name, partLabelPrefix, numSplits)
+}
+
+//NewPartitionMap makes a partition map
+//
+//the partition map will be backed by the provided HashRange
+//
+//name and partition label prefix have to be provided
+//
+//numSplits should be > 1
+func NewPartitionMap(h HashRange, name, partLabelPrefix string, numSplits int) (*PartitionMap, error) {
+	//create root partition that will be split
+	root := &Partition{Label: partLabelPrefix,
+		LowerBound: h.GetLowerBound(),
+		UpperBound: h.GetUpperBound()}
+
+	// split this root partition using an even splitter
+	splits, err := splitter.Split(root, numSplits)
+
+	if err != nil {
+		return nil, err
+	}
+
+	//new partition map
+	keyMap := make(map[string]*Partition, len(splits))
+	for _, v := range splits {
+		keyMap[v.Label] = v
+	}
+	return &PartitionMap{Name: name, Partitions: splits, Range: h, keyMap: keyMap}, nil
 }
 
 //HashRange is a combination of a hash function and lower and upper bounds of the

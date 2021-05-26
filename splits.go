@@ -9,6 +9,15 @@ import (
 //required number of partitions, a Splitter understands how to split a partition
 //implementations can use any strategy to split the partitions as long as they are valid
 //see reference implementation NewEvenSplitter for details
+//
+//NOTE: the splitter should reason about the label suffixes as well
+//once convention that can be followed is if a partition to be split
+//is labelled "partition-7" then the splits can be of the form
+//"partition-7-0", "partition-7-1"...."partition-7-<n>" where n == numSplits
+//
+//any splitting strategy can be used for the split, for a non trivial split
+//the Splitter usually needs some underlying knowledge of the key space it is
+//dealing with
 type Splitter interface {
 
 	//Split splits the given partition p into numSplits if the splitter cannot split
@@ -79,14 +88,8 @@ func setUpperBoundAndCarry(base, step, leftOver *big.Int) *big.Int {
 	// set the upper bound
 	ub := new(big.Int)
 	ub.Add(base, step)
-
-	// if we need to carry over we need
-	carry := false
 	if leftOver.Cmp(BigZero) > 0 {
-		carry = true
 		leftOver.Sub(leftOver, BigOne)
-	}
-	if carry {
 		ub.Add(ub, BigOne)
 	}
 	return ub

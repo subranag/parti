@@ -25,6 +25,7 @@ func newMD5HashRange() HashRange {
 	md5 := md5.New()
 	lb := big.NewInt(0)
 	ub := new(big.Int)
+	// MD5 is 128 bit hash so ub is 2^128 - 1
 	ub.SetString("ffffffffffffffffffffffffffffffff", 16)
 	return &md5HashRange{md5, lb, ub}
 }
@@ -47,7 +48,7 @@ func newSHA256HashRange() HashRange {
 	sha := sha256.New()
 	lb := big.NewInt(0)
 	ub := new(big.Int)
-	// SHA256 is 256 bit hash
+	// SHA256 is 256 bit hash so ub is 2^256 - 1
 	ub.SetString("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
 	return &sha256HashRange{sha, lb, ub}
 }
