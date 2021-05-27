@@ -1,6 +1,8 @@
 package parti
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash"
@@ -56,6 +58,35 @@ func (p *Partition) String() string {
 	return fmt.Sprintf("partition{label:%s, lb:%s, ub:%s}", p.Label, p.LowerBound.Text(16), p.UpperBound.Text(16))
 }
 
+func (p *Partition) MarshalJSON() ([]byte, error) {
+	sb := bytes.NewBufferString("{")
+	sb.WriteString(fmt.Sprintf("\"%v\":\"%v\",", "label", p.Label))
+	sb.WriteString(fmt.Sprintf("\"%v\":\"%v\",", "lower_bound", p.LowerBound.Text(16)))
+	sb.WriteString(fmt.Sprintf("\"%v\":\"%v\"", "upper_bound", p.UpperBound.Text(16)))
+	sb.WriteString("}")
+	return sb.Bytes(), nil
+}
+
+func (p *Partition) UnmarshalJSON(b []byte) error {
+	pdata := make(map[string]string)
+	if err := json.Unmarshal(b, pdata); err != nil {
+		return err
+	}
+	p.Label = pdata["label"]
+	lb := new(big.Int)
+	if _, ok := lb.SetString(pdata["lower_bound"], 16); !ok {
+		return invalidPartition(fmt.Sprintf("invalid lower bound %v", pdata["lower_bound"]))
+	}
+	p.LowerBound = lb
+
+	ub := new(big.Int)
+	if _, ok := ub.SetString(pdata["upper_bound"], 16); !ok {
+		return invalidPartition(fmt.Sprintf("invalid upper bound %v", pdata["lower_bound"]))
+	}
+	p.UpperBound = ub
+	return nil
+}
+
 func validatePartition(p *Partition) error {
 
 	if p == nil {
@@ -83,17 +114,17 @@ func validatePartition(p *Partition) error {
 //on the partition map
 type PartitionMap struct {
 	//Name uniquely identifies a partition
-	Name string
+	Name string `json:"map_name"`
 
 	//Partitions are the partitions in this partition map as dictated by the HashRange
-	Partitions []*Partition
+	Partitions []*Partition `json:"partitions"`
 
 	//Range is the HashRange of the partition map
-	Range HashRange
+	Range HashRange `json:"-"`
 
 	//keyMap is a map of partition labels to respective partitions
 	//NOTE: this filed is not exposed
-	keyMap map[string]*Partition
+	keyMap map[string]*Partition `json:"-"`
 }
 
 //NewMD5PartitionMap creates a partition map backed by the MD5 hash function
