@@ -14,11 +14,11 @@ type md5HashRange struct {
 	upperBound *big.Int
 }
 
-func (md5 *md5HashRange) GetLowerBound() *big.Int {
+func (md5 *md5HashRange) LowerBound() *big.Int {
 	return md5.lowerBound
 }
 
-func (md5 *md5HashRange) GetUpperBound() *big.Int {
+func (md5 *md5HashRange) UpperBound() *big.Int {
 	return md5.upperBound
 }
 
@@ -50,11 +50,11 @@ type sha256HashRange struct {
 	upperBound *big.Int
 }
 
-func (sha *sha256HashRange) GetLowerBound() *big.Int {
+func (sha *sha256HashRange) LowerBound() *big.Int {
 	return sha.lowerBound
 }
 
-func (sha *sha256HashRange) GetUpperBound() *big.Int {
+func (sha *sha256HashRange) UpperBound() *big.Int {
 	return sha.upperBound
 }
 

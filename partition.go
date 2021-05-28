@@ -155,8 +155,8 @@ func NewSHA256PartitionMap(name, partLabelPrefix string, numSplits int) (*Partit
 func NewPartitionMap(h HashRange, name, partLabelPrefix string, numSplits int) (*PartitionMap, error) {
 	//create root partition that will be split
 	root := &Partition{Label: partLabelPrefix,
-		LowerBound: h.GetLowerBound(),
-		UpperBound: h.GetUpperBound()}
+		LowerBound: h.LowerBound(),
+		UpperBound: h.UpperBound()}
 
 	// split this root partition using an even splitter
 	splits, err := splitter.Split(root, numSplits)
@@ -181,16 +181,16 @@ type HashRange interface {
 	//hash function
 	hash.Hash
 
-	//GetLowerBound gets the lower bound of this hash range the absolute smallest
+	//LowerBound gets the lower bound of this hash range the absolute smallest
 	//value as supported by the hash function, this is typically 0
-	GetLowerBound() *big.Int
+	LowerBound() *big.Int
 
-	//GetUpperBound gets the upper bound of this hash range the absolute largest
+	//UpperBound gets the upper bound of this hash range the absolute largest
 	//value as supported by the hash function, this is typically of the form 2^n-1
 	//where n is the n bit hash e.g.
 	//MD5 is a 128 bit hash hence the max value of any hash output is
 	//0xffffffffffffffffffffffffffffffff
-	GetUpperBound() *big.Int
+	UpperBound() *big.Int
 
 	//HashFunctionName returns the human readable name of the hash function
 	//backing this HashRange e.g. MD5, SHA256, SPOOKY, MURMUR etc
