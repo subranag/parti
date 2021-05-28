@@ -177,6 +177,12 @@ func NewPartitionMap(h HashRange, name, partLabelPrefix string, numSplits int) (
 //range of the hash function, the implicit assumption here is that the hash has a
 //implicit lower bound and upper bound inclusive
 type HashRange interface {
+	//json.Marshaler hash range needs to provide a JSON Marshaler
+	json.Marshaler
+
+	//json.Unmarshaler hash range needs to provide a JSON Unmarshaler
+	json.Unmarshaler
+
 	//hash.Hash the hash range is always and extension of a general purpose
 	//hash function
 	hash.Hash
