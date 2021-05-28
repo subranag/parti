@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	pmap, err := parti.NewMD5PartitionMap("key_store", "partition", 100)
+	pmap, err := parti.NewSHA256PartitionMap("key_store", "partition", 100)
 	if err != nil {
 		fmt.Println(err)
 		return

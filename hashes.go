@@ -3,6 +3,7 @@ package parti
 import (
 	"crypto/md5"
 	"crypto/sha256"
+	"fmt"
 	"hash"
 	"math/big"
 )
@@ -19,6 +20,19 @@ func (md5 *md5HashRange) GetLowerBound() *big.Int {
 
 func (md5 *md5HashRange) GetUpperBound() *big.Int {
 	return md5.upperBound
+}
+
+func (md5 *md5HashRange) HashFunctionName() string {
+	return "MD5"
+}
+
+func (md5 *md5HashRange) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%v\"", md5.HashFunctionName())), nil
+}
+
+func (md5 *md5HashRange) UnmarshalJSON(b []byte) error {
+	// nothing to do while un-marshalling
+	return nil
 }
 
 func newMD5HashRange() HashRange {
@@ -42,6 +56,19 @@ func (sha *sha256HashRange) GetLowerBound() *big.Int {
 
 func (sha *sha256HashRange) GetUpperBound() *big.Int {
 	return sha.upperBound
+}
+
+func (sha *sha256HashRange) HashFunctionName() string {
+	return "SHA256"
+}
+
+func (sha *sha256HashRange) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%v\"", sha.HashFunctionName())), nil
+}
+
+func (sha *sha256HashRange) UnmarshalJSON(b []byte) error {
+	// nothing to do while un-marshalling
+	return nil
 }
 
 func newSHA256HashRange() HashRange {

@@ -120,7 +120,7 @@ type PartitionMap struct {
 	Partitions []*Partition `json:"partitions"`
 
 	//Range is the HashRange of the partition map
-	Range HashRange `json:"-"`
+	Range HashRange `json:"hash_function"`
 
 	//keyMap is a map of partition labels to respective partitions
 	//NOTE: this filed is not exposed
@@ -191,4 +191,8 @@ type HashRange interface {
 	//MD5 is a 128 bit hash hence the max value of any hash output is
 	//0xffffffffffffffffffffffffffffffff
 	GetUpperBound() *big.Int
+
+	//HashFunctionName returns the human readable name of the hash function
+	//backing this HashRange e.g. MD5, SHA256, SPOOKY, MURMUR etc
+	HashFunctionName() string
 }
