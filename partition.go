@@ -7,12 +7,16 @@ import (
 	"fmt"
 	"hash"
 	"math/big"
+	"sort"
 	"strings"
+	"sync"
 )
 
 var PartitionNilError = errors.New("provided partition cannot be nil")
 
 var InvalidNumSplits = errors.New("a partition can only be split into partitions > 1")
+
+var InvalidKey = errors.New("Invalid key provided, key should be []byte with len > 0")
 
 var BigOne *big.Int = big.NewInt(1)
 var BigZero *big.Int = big.NewInt(0)
@@ -39,30 +43,42 @@ func invalidPartition(reason string) *InvalidPartitionError {
 //the partition bounds are closed intervals not open intervals
 //a partition does not have existence by itself it always belongs to a partition map
 type Partition struct {
-	//Label uniquely identifies a partition in the partition map
-	Label string
+	//label uniquely identifies a partition in the partition map
+	label string
 
-	//LowerBound of the partition, i.e. any given key in this partition will have
-	//value >=LowerBound
-	LowerBound *big.Int
+	//lowerBound of the partition, i.e. any given key in this partition will have
+	//value >=lowerBound
+	lowerBound *big.Int
 
-	//UpperBound of the partition, i.e. any given key in this partition will have
-	//value <=UpperBound
-	UpperBound *big.Int
+	//upperBound of the partition, i.e. any given key in this partition will have
+	//value <=upperBound
+	upperBound *big.Int
+}
+
+func (p *Partition) Label() string {
+	return p.label
+}
+
+func (p *Partition) LowerBound() string {
+	return p.lowerBound.Text(16)
+}
+
+func (p *Partition) UpperBound() string {
+	return p.upperBound.Text(16)
 }
 
 func (p *Partition) String() string {
 	if p == nil {
 		return ""
 	}
-	return fmt.Sprintf("partition{label:%s, lb:%s, ub:%s}", p.Label, p.LowerBound.Text(16), p.UpperBound.Text(16))
+	return fmt.Sprintf("partition{label:%s, lb:%s, ub:%s}", p.label, p.lowerBound.Text(16), p.upperBound.Text(16))
 }
 
 func (p *Partition) MarshalJSON() ([]byte, error) {
 	sb := bytes.NewBufferString("{")
-	sb.WriteString(fmt.Sprintf("\"%v\":\"%v\",", "label", p.Label))
-	sb.WriteString(fmt.Sprintf("\"%v\":\"%v\",", "lower_bound", p.LowerBound.Text(16)))
-	sb.WriteString(fmt.Sprintf("\"%v\":\"%v\"", "upper_bound", p.UpperBound.Text(16)))
+	sb.WriteString(fmt.Sprintf("\"%v\":\"%v\",", "label", p.label))
+	sb.WriteString(fmt.Sprintf("\"%v\":\"%v\",", "lower_bound", p.lowerBound.Text(16)))
+	sb.WriteString(fmt.Sprintf("\"%v\":\"%v\"", "upper_bound", p.upperBound.Text(16)))
 	sb.WriteString("}")
 	return sb.Bytes(), nil
 }
@@ -72,18 +88,18 @@ func (p *Partition) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, pdata); err != nil {
 		return err
 	}
-	p.Label = pdata["label"]
+	p.label = pdata["label"]
 	lb := new(big.Int)
 	if _, ok := lb.SetString(pdata["lower_bound"], 16); !ok {
 		return invalidPartition(fmt.Sprintf("invalid lower bound %v", pdata["lower_bound"]))
 	}
-	p.LowerBound = lb
+	p.lowerBound = lb
 
 	ub := new(big.Int)
 	if _, ok := ub.SetString(pdata["upper_bound"], 16); !ok {
 		return invalidPartition(fmt.Sprintf("invalid upper bound %v", pdata["lower_bound"]))
 	}
-	p.UpperBound = ub
+	p.upperBound = ub
 	return nil
 }
 
@@ -93,15 +109,15 @@ func validatePartition(p *Partition) error {
 		return PartitionNilError
 	}
 
-	if p.LowerBound == nil || p.UpperBound == nil {
+	if p.lowerBound == nil || p.upperBound == nil {
 		return invalidPartition("neither partition LowerBound nor UpperBound cannot be nil")
 	}
 
-	if p.LowerBound.Cmp(p.UpperBound) >= 0 {
+	if p.lowerBound.Cmp(p.upperBound) >= 0 {
 		return invalidPartition("partition LowerBound should be strictly less than UpperBound: LowerBound < UpperBound")
 	}
 
-	if p.Label == "" || strings.Trim(p.Label, " ") == "" {
+	if p.label == "" || strings.Trim(p.label, " ") == "" {
 		return invalidPartition("partition label can be whitespaces/empty")
 	}
 
@@ -125,6 +141,54 @@ type PartitionMap struct {
 	//keyMap is a map of partition labels to respective partitions
 	//NOTE: this filed is not exposed
 	keyMap map[string]*Partition `json:"-"`
+
+	//hashMu is the mutex used when resolving a key and manages
+	//safe concurrent access to calculation of hash given a key byte
+	//sequence
+	hashMu sync.Mutex
+
+	//sortMu is the mutex used to sort the Partitions in the partition map
+	//while resolving the key we use a binary search to isolate the key
+	//so the partitions need to be sorted
+	sortMu sync.Mutex
+}
+
+//ResolvePartition resolves the partition for the given key
+//the hash of the key is calculated and slotted to the correct range
+//in the partition map
+func (pm *PartitionMap) ResolvePartition(key []byte) (*Partition, error) {
+	if len(key) == 0 {
+		return nil, InvalidKey
+	}
+
+	hash := pm.keyHash(key)
+	fmt.Println(hash.Text(16))
+	return nil, nil
+}
+
+func (pm *PartitionMap) keyHash(key []byte) *big.Int {
+	pm.hashMu.Lock()
+	defer pm.hashMu.Unlock()
+
+	pm.Range.Reset()
+	pm.Range.Write(key)
+	hash := new(big.Int)
+	hash.SetBytes(pm.Range.Sum(nil))
+	return hash
+}
+
+func (pm *PartitionMap) sortPartitions() {
+	sorted := sort.SliceIsSorted(pm.Partitions, func(i, j int) bool {
+		return pm.Partitions[i].lowerBound.Cmp(pm.Partitions[j].lowerBound) < 0
+	})
+
+	if !sorted {
+		pm.sortMu.Lock()
+		defer pm.sortMu.Unlock()
+		sort.Slice(pm.Partitions, func(i, j int) bool {
+			return pm.Partitions[i].lowerBound.Cmp(pm.Partitions[j].lowerBound) < 0
+		})
+	}
 }
 
 //NewMD5PartitionMap creates a partition map backed by the MD5 hash function
@@ -154,9 +218,9 @@ func NewSHA256PartitionMap(name, partLabelPrefix string, numSplits int) (*Partit
 //numSplits should be > 1
 func NewPartitionMap(h HashRange, name, partLabelPrefix string, numSplits int) (*PartitionMap, error) {
 	//create root partition that will be split
-	root := &Partition{Label: partLabelPrefix,
-		LowerBound: h.LowerBound(),
-		UpperBound: h.UpperBound()}
+	root := &Partition{label: partLabelPrefix,
+		lowerBound: h.LowerBound(),
+		upperBound: h.UpperBound()}
 
 	// split this root partition using an even splitter
 	splits, err := splitter.Split(root, numSplits)
@@ -168,9 +232,11 @@ func NewPartitionMap(h HashRange, name, partLabelPrefix string, numSplits int) (
 	//new partition map
 	keyMap := make(map[string]*Partition, len(splits))
 	for _, v := range splits {
-		keyMap[v.Label] = v
+		keyMap[v.label] = v
 	}
-	return &PartitionMap{Name: name, Partitions: splits, Range: h, keyMap: keyMap}, nil
+	pm := &PartitionMap{Name: name, Partitions: splits, Range: h, keyMap: keyMap}
+	pm.sortPartitions()
+	return pm, nil
 }
 
 //HashRange is a combination of a hash function and lower and upper bounds of the

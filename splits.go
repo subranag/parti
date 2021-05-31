@@ -42,7 +42,7 @@ func (e *evenSplitter) Split(p *Partition, numSplits int) ([]*Partition, error) 
 
 	// first get delta
 	delta := new(big.Int)
-	delta.Sub(p.UpperBound, p.LowerBound)
+	delta.Sub(p.upperBound, p.lowerBound)
 
 	// get divide result
 	step := new(big.Int)
@@ -62,23 +62,23 @@ func (e *evenSplitter) Split(p *Partition, numSplits int) ([]*Partition, error) 
 
 	for i := 0; i < numSplits; i++ {
 
-		label := fmt.Sprintf("%s-%d", p.Label, i)
-		newPart := &Partition{Label: label}
+		label := fmt.Sprintf("%s-%d", p.label, i)
+		newPart := &Partition{label: label}
 		lb := new(big.Int)
 
 		if prevUpperBound == nil {
 			// set first part lb to original part lb
-			lb.SetString(p.LowerBound.String(), 10)
+			lb.SetString(p.lowerBound.String(), 10)
 			prevUpperBound = lb
 		} else {
 			lb.Add(prevUpperBound, BigOne)
 		}
 
-		newPart.LowerBound = lb
-		newPart.UpperBound = setUpperBoundAndCarry(prevUpperBound, step, leftOver)
+		newPart.lowerBound = lb
+		newPart.upperBound = setUpperBoundAndCarry(prevUpperBound, step, leftOver)
 
 		result[i] = newPart
-		prevUpperBound = newPart.UpperBound
+		prevUpperBound = newPart.upperBound
 	}
 
 	return result, nil

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/subranag/parti"
@@ -13,11 +12,5 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-
-	pmapJson, err := json.Marshal(pmap)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(string(pmapJson))
+	pmap.ResolvePartition([]byte("subbu is cool"))
 }
