@@ -163,6 +163,11 @@ func (pm *PartitionMap) ResolvePartition(key []byte) (*Partition, error) {
 
 	hash := pm.keyHash(key)
 	fmt.Println(hash.Text(16))
+	// binary search the partition this key belongs to
+	find := sort.Search(len(pm.Partitions), func(idx int) bool {
+		return hash.Cmp(pm.Partitions[idx].upperBound) <= 0
+	})
+	fmt.Println(pm.Partitions[find])
 	return nil, nil
 }
 

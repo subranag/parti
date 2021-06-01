@@ -1,16 +1,19 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/subranag/parti"
 )
 
 func main() {
-	pmap, err := parti.NewSHA256PartitionMap("key_store", "partition", 100)
+	pmap, err := parti.NewMD5PartitionMap("key_store", "partition", 100)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	pmap.ResolvePartition([]byte("subbu is cool"))
+	pmapJson, _ := json.Marshal(pmap)
+	fmt.Println(string(pmapJson))
+	pmap.ResolvePartition([]byte("nagarajan "))
 }
