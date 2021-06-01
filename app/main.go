@@ -15,5 +15,7 @@ func main() {
 	}
 	pmapJson, _ := json.Marshal(pmap)
 	fmt.Println(string(pmapJson))
-	pmap.ResolvePartition([]byte("nagarajan "))
+	prt, err := pmap.ResolvePartition([]byte("takethat"))
+	fmt.Println(err)
+	fmt.Println(prt)
 }

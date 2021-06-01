@@ -18,8 +18,8 @@ var InvalidNumSplits = errors.New("a partition can only be split into partitions
 
 var InvalidKey = errors.New("Invalid key provided, key should be []byte with len > 0")
 
-var BigOne *big.Int = big.NewInt(1)
-var BigZero *big.Int = big.NewInt(0)
+var bigOne *big.Int = big.NewInt(1)
+var bigZero *big.Int = big.NewInt(0)
 
 var splitter = NewEvenSplitter()
 
@@ -37,11 +37,11 @@ func invalidPartition(reason string) *InvalidPartitionError {
 	return &InvalidPartitionError{reason: reason}
 }
 
-//Partition represents a single partition in the partition map
-//single partition is a unique range in the entire hash range partition map
-//the key into a partition is the partition label which is guranteed to be unique
-//the partition bounds are closed intervals not open intervals
-//a partition does not have existence by itself it always belongs to a partition map
+/*Partition represents a single partition in the partition map
+single partition is a unique range in the entire hash range partition map
+the key into a partition is the partition label which is guranteed to be unique
+the partition bounds are closed intervals not open intervals
+a partition does not have existence by itself it always belongs to a partition map */
 type Partition struct {
 	//label uniquely identifies a partition in the partition map
 	label string
@@ -124,10 +124,9 @@ func validatePartition(p *Partition) error {
 	return nil
 }
 
-//PartitionMap represents a hash range partition map, a partition Map contains one
-//or more partitions as dictated by the HashRange, a partition map is uniquely identified
-//by partition map name, an optional descreption can be provided that provides more context
-//on the partition map
+/*PartitionMap represents a hash range partition map, a partition Map contains one
+or more partitions as dictated by the HashRange, a partition map is uniquely identified
+by partition map name*/
 type PartitionMap struct {
 	//Name uniquely identifies a partition
 	Name string `json:"map_name"`
@@ -140,40 +139,52 @@ type PartitionMap struct {
 
 	//keyMap is a map of partition labels to respective partitions
 	//NOTE: this filed is not exposed
-	keyMap map[string]*Partition `json:"-"`
+	keyMap map[string]*Partition
 
-	//hashMu is the mutex used when resolving a key and manages
+	//hashMutx is the mutex used when resolving a key and manages
 	//safe concurrent access to calculation of hash given a key byte
 	//sequence
-	hashMu sync.Mutex
+	hashMutx sync.Mutex
 
-	//sortMu is the mutex used to sort the Partitions in the partition map
-	//while resolving the key we use a binary search to isolate the key
-	//so the partitions need to be sorted
-	sortMu sync.Mutex
+	//mutateMutx is the mutex used to coordinate all mutations to the
+	//partition map including sorting & split, the isolation guarantee
+	//is of course only for this process and memory space
+	mutateMutx sync.RWMutex
 }
 
-//ResolvePartition resolves the partition for the given key
-//the hash of the key is calculated and slotted to the correct range
-//in the partition map
+/*ResolvePartition resolves the partition for the given key
+
+the hash of the key is calculated and slotted to the correct range
+in the partition map
+
+NOTE: this operation is safe against concurrent mutation of the
+partition map*/
 func (pm *PartitionMap) ResolvePartition(key []byte) (*Partition, error) {
 	if len(key) == 0 {
 		return nil, InvalidKey
 	}
 
 	hash := pm.keyHash(key)
-	fmt.Println(hash.Text(16))
-	// binary search the partition this key belongs to
+
+	// binary search the key in partition ranges
+	//acquire read lock and unlock after resolving partition
+	pm.mutateMutx.RLock()
+	defer pm.mutateMutx.RUnlock()
 	find := sort.Search(len(pm.Partitions), func(idx int) bool {
 		return hash.Cmp(pm.Partitions[idx].upperBound) <= 0
 	})
-	fmt.Println(pm.Partitions[find])
-	return nil, nil
+
+	// found match return the partition
+	if find < len(pm.Partitions) {
+		return pm.Partitions[find], nil
+	}
+	//NOTE: this should really not happen panic here
+	panic("the hash of the given non-empty key did not belong to any range in the partition map")
 }
 
 func (pm *PartitionMap) keyHash(key []byte) *big.Int {
-	pm.hashMu.Lock()
-	defer pm.hashMu.Unlock()
+	pm.hashMutx.Lock()
+	defer pm.hashMutx.Unlock()
 
 	pm.Range.Reset()
 	pm.Range.Write(key)
@@ -188,8 +199,8 @@ func (pm *PartitionMap) sortPartitions() {
 	})
 
 	if !sorted {
-		pm.sortMu.Lock()
-		defer pm.sortMu.Unlock()
+		pm.mutateMutx.Lock()
+		defer pm.mutateMutx.Unlock()
 		sort.Slice(pm.Partitions, func(i, j int) bool {
 			return pm.Partitions[i].lowerBound.Cmp(pm.Partitions[j].lowerBound) < 0
 		})

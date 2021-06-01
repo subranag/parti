@@ -71,7 +71,7 @@ func (e *evenSplitter) Split(p *Partition, numSplits int) ([]*Partition, error) 
 			lb.SetString(p.lowerBound.String(), 10)
 			prevUpperBound = lb
 		} else {
-			lb.Add(prevUpperBound, BigOne)
+			lb.Add(prevUpperBound, bigOne)
 		}
 
 		newPart.lowerBound = lb
@@ -88,9 +88,9 @@ func setUpperBoundAndCarry(base, step, leftOver *big.Int) *big.Int {
 	// set the upper bound
 	ub := new(big.Int)
 	ub.Add(base, step)
-	if leftOver.Cmp(BigZero) > 0 {
-		leftOver.Sub(leftOver, BigOne)
-		ub.Add(ub, BigOne)
+	if leftOver.Cmp(bigZero) > 0 {
+		leftOver.Sub(leftOver, bigOne)
+		ub.Add(ub, bigOne)
 	}
 	return ub
 }
